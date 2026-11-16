@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #define CHECK(condition) do { \
@@ -100,8 +101,14 @@ static int test_full_queue(void)
 
 static int test_status_strings(void)
 {
-    CHECK(thread_pool_status_string(THREAD_POOL_OK) != NULL);
-    CHECK(thread_pool_status_string((thread_pool_status_t)999) != NULL);
+    CHECK(strcmp(thread_pool_status_string(THREAD_POOL_OK), "success") == 0);
+    CHECK(strcmp(thread_pool_status_string(THREAD_POOL_INVALID_ARGUMENT), "invalid argument") == 0);
+    CHECK(strcmp(thread_pool_status_string(THREAD_POOL_OUT_OF_MEMORY), "out of memory") == 0);
+    CHECK(strcmp(thread_pool_status_string(THREAD_POOL_QUEUE_FULL), "task queue full") == 0);
+    CHECK(strcmp(thread_pool_status_string(THREAD_POOL_SHUTTING_DOWN), "pool is shutting down") == 0);
+    CHECK(strcmp(thread_pool_status_string(THREAD_POOL_SYSTEM_ERROR), "system error") == 0);
+    CHECK(strcmp(thread_pool_status_string((thread_pool_status_t)999), "unknown status") == 0);
+    CHECK(strcmp(thread_pool_status_string((thread_pool_status_t)1000), "unknown status") == 0);
     return 0;
 }
 
