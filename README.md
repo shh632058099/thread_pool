@@ -11,6 +11,17 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+## Development verification
+
+From the repository root, configure with CMake's Ninja generator, build the
+project, and run the CTest suite:
+
+```sh
+cmake -S . -B build -G Ninja -DTHREAD_POOL_BUILD_TESTS=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
 ## API
 
 Include `thread_pool.h` and link the `thread_pool` CMake target (which links
