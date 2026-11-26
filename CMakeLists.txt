@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(thread_pool VERSION 1.0.0 LANGUAGES C)
+project(thread_pool VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -26,4 +26,11 @@ if(THREAD_POOL_BUILD_TESTS)
         target_compile_options(thread_pool_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME thread_pool_tests COMMAND thread_pool_tests)
+
+    add_executable(thread_pool_cpp_compatibility tests/test_cpp_compatibility.cpp)
+    target_link_libraries(thread_pool_cpp_compatibility PRIVATE thread_pool)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(thread_pool_cpp_compatibility PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME thread_pool_cpp_compatibility COMMAND thread_pool_cpp_compatibility)
 endif()
