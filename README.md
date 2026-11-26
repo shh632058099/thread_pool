@@ -11,6 +11,20 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+## Examples
+
+Examples are built by default with the library:
+
+```sh
+./build/thread_pool_example_basic
+./build/thread_pool_example_bounded_queue
+```
+
+`basic` submits tasks and drains them at shutdown. `bounded_queue` shows how a
+full, non-blocking queue reports `THREAD_POOL_QUEUE_FULL` while accepted work
+continues to drain. Disable example targets with
+`-DTHREAD_POOL_BUILD_EXAMPLES=OFF`.
+
 ## API
 
 Include `thread_pool.h` and link the `thread_pool` CMake target (which links
