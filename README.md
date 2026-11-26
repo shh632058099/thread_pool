@@ -32,3 +32,18 @@ has finished. The pool drains all accepted work at shutdown.
 
 Status results are defined by `thread_pool_status_t`; use
 `thread_pool_status_string()` for a readable description.
+
+## Examples
+
+The examples are disabled by default. Enable them to build a C example and a
+C++11 example that submit synchronized counter tasks and verify that the pool
+drains all accepted work before callback arguments go out of scope:
+
+```sh
+cmake -S . -B build-examples -DTHREAD_POOL_BUILD_EXAMPLES=ON
+cmake --build build-examples
+./build-examples/thread_pool_basic_example
+./build-examples/thread_pool_cpp_example
+```
+
+The C++ example uses the C API through the header's `extern "C"` declarations.
