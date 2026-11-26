@@ -13,6 +13,15 @@ target_include_directories(thread_pool
            $<INSTALL_INTERFACE:include>)
 target_link_libraries(thread_pool PUBLIC Threads::Threads)
 
+option(THREAD_POOL_BUILD_EXAMPLE "Build the thread pool example" ON)
+if(THREAD_POOL_BUILD_EXAMPLE)
+    add_executable(thread_pool_example examples/thread_pool_example.c)
+    target_link_libraries(thread_pool_example PRIVATE thread_pool)
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(thread_pool_example PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+endif()
+
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(thread_pool PRIVATE -Wall -Wextra -Wpedantic)
 endif()

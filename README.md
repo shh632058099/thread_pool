@@ -11,6 +11,16 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+The `thread_pool_example` executable is built by default. Run it with:
+
+```sh
+./build/thread_pool_example
+```
+
+It submits ten independent square-calculation tasks, then destroys the pool to
+wait for all accepted tasks before printing their results. Disable the example
+with `-DTHREAD_POOL_BUILD_EXAMPLE=OFF` when configuring if it is not needed.
+
 ## API
 
 Include `thread_pool.h` and link the `thread_pool` CMake target (which links
