@@ -30,5 +30,18 @@ Include `thread_pool.h` and link the `thread_pool` CMake target (which links
 The pool does not own task arguments: keep each `arg` alive until its callback
 has finished. The pool drains all accepted work at shutdown.
 
+## C++ example
+
+The public header supports C++ callers. Enable the optional C++11 example with:
+
+```sh
+cmake -S . -B build -DTHREAD_POOL_BUILD_EXAMPLES=ON
+cmake --build build --target thread_pool_cpp_example
+./build/thread_pool_cpp_example
+```
+
+The example protects shared task state with a C++ mutex, submits 1,000 tasks to
+four workers, and verifies that graceful shutdown drains all accepted tasks.
+
 Status results are defined by `thread_pool_status_t`; use
 `thread_pool_status_string()` for a readable description.
