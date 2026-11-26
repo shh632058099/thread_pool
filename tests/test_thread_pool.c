@@ -19,19 +19,32 @@ struct counter {
     size_t value;
 };
 
+struct task_gate {
+    pthread_mutex_t mutex;
+    pthread_cond_t condition;
+    int started;
+    int released;
+};
+
+static void gated_increment(void *opaque)
+{
+    struct task_gate *gate = (struct task_gate *)opaque;
+
+    (void)pthread_mutex_lock(&gate->mutex);
+    gate->started = 1;
+    (void)pthread_cond_broadcast(&gate->condition);
+    while (!gate->released) {
+        (void)pthread_cond_wait(&gate->condition, &gate->mutex);
+    }
+    (void)pthread_mutex_unlock(&gate->mutex);
+}
+
 static void increment(void *opaque)
 {
     struct counter *counter = (struct counter *)opaque;
     (void)pthread_mutex_lock(&counter->mutex);
     ++counter->value;
     (void)pthread_mutex_unlock(&counter->mutex);
-}
-
-static void slow_increment(void *opaque)
-{
-    const struct timespec delay = { 0, 50000000L };
-    (void)nanosleep(&delay, NULL);
-    increment(opaque);
 }
 
 static int test_invalid_arguments(void)
@@ -69,32 +82,36 @@ static int test_submit_and_drain(void)
 
 static int test_full_queue(void)
 {
-    struct counter counter;
+    struct task_gate gate;
     thread_pool_t *pool = NULL;
-    size_t attempts;
-    int saw_full = 0;
-    const struct timespec delay = { 0, 1000000L };
 
-    counter.value = 0U;
-    CHECK(pthread_mutex_init(&counter.mutex, NULL) == 0);
+    gate.started = 0;
+    gate.released = 0;
+    CHECK(pthread_mutex_init(&gate.mutex, NULL) == 0);
+    CHECK(pthread_cond_init(&gate.condition, NULL) == 0);
     CHECK(thread_pool_create(&pool, 1U, 1U) == THREAD_POOL_OK);
 
-    /* Keep the worker busy, then occupy the sole waiting slot. */
-    CHECK(thread_pool_submit(pool, slow_increment, &counter) == THREAD_POOL_OK);
-    for (attempts = 0U; attempts < 1000U; ++attempts) {
-        if (thread_pool_pending(pool) == 0U) {
-            break;
-        }
-        (void)nanosleep(&delay, NULL);
+    /* Hold the worker in the first task, guaranteeing the next task stays queued. */
+    CHECK(thread_pool_submit(pool, gated_increment, &gate) == THREAD_POOL_OK);
+    CHECK(pthread_mutex_lock(&gate.mutex) == 0);
+    while (!gate.started) {
+        CHECK(pthread_cond_wait(&gate.condition, &gate.mutex) == 0);
     }
-    CHECK(thread_pool_submit(pool, slow_increment, &counter) == THREAD_POOL_OK);
-    CHECK(thread_pool_submit(pool, slow_increment, &counter) == THREAD_POOL_QUEUE_FULL);
-    saw_full = 1;
-    CHECK(saw_full);
+    CHECK(pthread_mutex_unlock(&gate.mutex) == 0);
+    CHECK(thread_pool_pending(pool) == 0U);
 
+    /* The second task occupies the sole pending slot while the worker is gated. */
+    CHECK(thread_pool_submit(pool, gated_increment, &gate) == THREAD_POOL_OK);
+    CHECK(thread_pool_pending(pool) == 1U);
+    CHECK(thread_pool_submit(pool, gated_increment, &gate) == THREAD_POOL_QUEUE_FULL);
+
+    CHECK(pthread_mutex_lock(&gate.mutex) == 0);
+    gate.released = 1;
+    CHECK(pthread_cond_broadcast(&gate.condition) == 0);
+    CHECK(pthread_mutex_unlock(&gate.mutex) == 0);
     thread_pool_destroy(pool);
-    CHECK(counter.value == 2U);
-    CHECK(pthread_mutex_destroy(&counter.mutex) == 0);
+    CHECK(pthread_cond_destroy(&gate.condition) == 0);
+    CHECK(pthread_mutex_destroy(&gate.mutex) == 0);
     return 0;
 }
 

@@ -1,9 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
-project(thread_pool VERSION 1.0.0 LANGUAGES C)
+project(thread_pool VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(Threads REQUIRED)
 
@@ -18,6 +21,15 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 option(THREAD_POOL_BUILD_TESTS "Build thread pool unit tests" ON)
+option(THREAD_POOL_BUILD_EXAMPLE "Build the C++ thread pool example" ON)
+if(THREAD_POOL_BUILD_EXAMPLE)
+    add_executable(thread_pool_example examples/thread_pool_example.cpp)
+    target_link_libraries(thread_pool_example PRIVATE thread_pool)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(thread_pool_example PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+endif()
+
 if(THREAD_POOL_BUILD_TESTS)
     enable_testing()
     add_executable(thread_pool_tests tests/test_thread_pool.c)

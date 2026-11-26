@@ -31,4 +31,21 @@ The pool does not own task arguments: keep each `arg` alive until its callback
 has finished. The pool drains all accepted work at shutdown.
 
 Status results are defined by `thread_pool_status_t`; use
-`thread_pool_status_string()` for a readable description.
+`thread_pool_status_string()` for a readable description. The example also shows
+how to query pending tasks, handle API status values, keep task arguments alive,
+and rely on destroy to drain accepted work and join workers.
+
+## Runnable example
+
+The default CMake configuration builds a C++11 consumer example, which also
+checks that the public header's `extern "C"` declarations link correctly from
+C++. Run it after building:
+
+```sh
+./build/thread_pool_example
+```
+
+The example creates a pool, submits atomic counter tasks, queries the pending
+queue, checks readable error statuses, and destroys the pool before checking
+that all accepted tasks completed. Its task argument remains alive until after
+the destroy call joins all workers.
