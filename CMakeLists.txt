@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
-project(thread_pool VERSION 1.0.0 LANGUAGES C)
+project(thread_pool VERSION 1.0.0 LANGUAGES C CXX)
+
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -13,7 +17,11 @@ target_include_directories(thread_pool
            $<INSTALL_INTERFACE:include>)
 target_link_libraries(thread_pool PUBLIC Threads::Threads)
 
+add_executable(thread_pool_basic examples/basic.c)
+target_link_libraries(thread_pool_basic PRIVATE thread_pool)
+
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(thread_pool_basic PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(thread_pool PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
@@ -26,4 +34,11 @@ if(THREAD_POOL_BUILD_TESTS)
         target_compile_options(thread_pool_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME thread_pool_tests COMMAND thread_pool_tests)
+
+    add_executable(thread_pool_cpp_consumer tests/test_cpp_consumer.cpp)
+    target_link_libraries(thread_pool_cpp_consumer PRIVATE thread_pool)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(thread_pool_cpp_consumer PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME thread_pool_cpp_consumer COMMAND thread_pool_cpp_consumer)
 endif()

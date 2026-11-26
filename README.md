@@ -32,3 +32,19 @@ has finished. The pool drains all accepted work at shutdown.
 
 Status results are defined by `thread_pool_status_t`; use
 `thread_pool_status_string()` for a readable description.
+
+## Runnable example
+
+`examples/basic.c` is a complete example using pool creation, submission,
+queue inspection, status reporting, and graceful shutdown. It keeps task
+arguments alive until `thread_pool_destroy()` has drained the accepted tasks,
+and protects shared state with a mutex. Build and run it with:
+
+```sh
+cmake -S . -B build
+cmake --build build --target thread_pool_basic
+./build/thread_pool_basic
+```
+
+The program prints the number of tasks that are still queued (which may be
+zero because workers execute concurrently), then prints a final sum of `10`.
