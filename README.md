@@ -32,3 +32,16 @@ has finished. The pool drains all accepted work at shutdown.
 
 Status results are defined by `thread_pool_status_t`; use
 `thread_pool_status_string()` for a readable description.
+
+## Examples
+
+`examples/basic.c` demonstrates creating a pool, submitting a task, handling
+status results, and relying on destruction to drain accepted work. Build it with
+CMake using `-DTHREAD_POOL_BUILD_EXAMPLES=ON`.
+
+`examples/basic.cpp` demonstrates calling the C API from C++. It can be compiled
+with a C++ compiler against the C library, for example:
+
+```sh
+c++ -std=c++11 -Iinclude examples/basic.cpp build/libthread_pool.a -pthread -o build/thread_pool_cpp_example
+```

@@ -1,10 +1,9 @@
-#define _POSIX_C_SOURCE 199309L
+#define _POSIX_C_SOURCE 200809L
 #include "thread_pool.h"
 
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 
 #define CHECK(condition) do { \
     if (!(condition)) { \
@@ -27,11 +26,29 @@ static void increment(void *opaque)
     (void)pthread_mutex_unlock(&counter->mutex);
 }
 
-static void slow_increment(void *opaque)
+static void do_nothing(void *opaque)
 {
-    const struct timespec delay = { 0, 50000000L };
-    (void)nanosleep(&delay, NULL);
-    increment(opaque);
+    (void)opaque;
+}
+
+struct blocking_task {
+    pthread_mutex_t mutex;
+    pthread_cond_t condition;
+    int started;
+    int release;
+};
+
+static void blocking_task_run(void *opaque)
+{
+    struct blocking_task *task = (struct blocking_task *)opaque;
+
+    (void)pthread_mutex_lock(&task->mutex);
+    task->started = 1;
+    (void)pthread_cond_broadcast(&task->condition);
+    while (!task->release) {
+        (void)pthread_cond_wait(&task->condition, &task->mutex);
+    }
+    (void)pthread_mutex_unlock(&task->mutex);
 }
 
 static int test_invalid_arguments(void)
@@ -69,32 +86,36 @@ static int test_submit_and_drain(void)
 
 static int test_full_queue(void)
 {
-    struct counter counter;
+    struct blocking_task task;
     thread_pool_t *pool = NULL;
-    size_t attempts;
-    int saw_full = 0;
-    const struct timespec delay = { 0, 1000000L };
+    thread_pool_status_t third_status;
 
-    counter.value = 0U;
-    CHECK(pthread_mutex_init(&counter.mutex, NULL) == 0);
+    task.started = 0;
+    task.release = 0;
+    CHECK(pthread_mutex_init(&task.mutex, NULL) == 0);
+    CHECK(pthread_cond_init(&task.condition, NULL) == 0);
     CHECK(thread_pool_create(&pool, 1U, 1U) == THREAD_POOL_OK);
 
-    /* Keep the worker busy, then occupy the sole waiting slot. */
-    CHECK(thread_pool_submit(pool, slow_increment, &counter) == THREAD_POOL_OK);
-    for (attempts = 0U; attempts < 1000U; ++attempts) {
-        if (thread_pool_pending(pool) == 0U) {
-            break;
-        }
-        (void)nanosleep(&delay, NULL);
+    CHECK(thread_pool_submit(pool, blocking_task_run, &task) == THREAD_POOL_OK);
+    CHECK(pthread_mutex_lock(&task.mutex) == 0);
+    while (!task.started) {
+        CHECK(pthread_cond_wait(&task.condition, &task.mutex) == 0);
     }
-    CHECK(thread_pool_submit(pool, slow_increment, &counter) == THREAD_POOL_OK);
-    CHECK(thread_pool_submit(pool, slow_increment, &counter) == THREAD_POOL_QUEUE_FULL);
-    saw_full = 1;
-    CHECK(saw_full);
+    CHECK(pthread_mutex_unlock(&task.mutex) == 0);
 
+    /* The worker is held by the first task, leaving one queue slot. */
+    CHECK(thread_pool_submit(pool, do_nothing, NULL) == THREAD_POOL_OK);
+    third_status = thread_pool_submit(pool, do_nothing, NULL);
+    CHECK(third_status == THREAD_POOL_QUEUE_FULL);
+
+    CHECK(pthread_mutex_lock(&task.mutex) == 0);
+    task.release = 1;
+    CHECK(pthread_cond_broadcast(&task.condition) == 0);
+    CHECK(pthread_mutex_unlock(&task.mutex) == 0);
     thread_pool_destroy(pool);
-    CHECK(counter.value == 2U);
-    CHECK(pthread_mutex_destroy(&counter.mutex) == 0);
+
+    CHECK(pthread_cond_destroy(&task.condition) == 0);
+    CHECK(pthread_mutex_destroy(&task.mutex) == 0);
     return 0;
 }
 
