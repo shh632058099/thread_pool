@@ -9,7 +9,15 @@ The project uses C99 and CMake.
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
+./build/thread_pool_example
 ```
+
+The example submits ten counter-increment tasks to a four-worker pool and
+prints the completed count. Its shared counter is protected by a mutex, and
+pool destruction drains accepted work before the counter is read.
+
+To configure without the example program, set
+`-DTHREAD_POOL_BUILD_EXAMPLES=OFF`.
 
 ## API
 
