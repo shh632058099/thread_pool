@@ -1,10 +1,8 @@
-#define _POSIX_C_SOURCE 199309L
 #include "thread_pool.h"
 
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 
 #define CHECK(condition) do { \
     if (!(condition)) { \
@@ -19,6 +17,15 @@ struct counter {
     size_t value;
 };
 
+struct task_gate {
+    pthread_mutex_t mutex;
+    pthread_cond_t condition;
+    size_t started;
+    size_t active;
+    size_t max_active;
+    int released;
+};
+
 static void increment(void *opaque)
 {
     struct counter *counter = (struct counter *)opaque;
@@ -27,11 +34,60 @@ static void increment(void *opaque)
     (void)pthread_mutex_unlock(&counter->mutex);
 }
 
-static void slow_increment(void *opaque)
+static void gated_task(void *opaque)
 {
-    const struct timespec delay = { 0, 50000000L };
-    (void)nanosleep(&delay, NULL);
-    increment(opaque);
+    struct task_gate *gate = (struct task_gate *)opaque;
+    (void)pthread_mutex_lock(&gate->mutex);
+    ++gate->started;
+    ++gate->active;
+    if (gate->active > gate->max_active) {
+        gate->max_active = gate->active;
+    }
+    (void)pthread_cond_broadcast(&gate->condition);
+    while (!gate->released) {
+        (void)pthread_cond_wait(&gate->condition, &gate->mutex);
+    }
+    --gate->active;
+    (void)pthread_mutex_unlock(&gate->mutex);
+}
+
+static int gate_init(struct task_gate *gate)
+{
+    gate->started = 0U;
+    gate->active = 0U;
+    gate->max_active = 0U;
+    gate->released = 0;
+    if (pthread_mutex_init(&gate->mutex, NULL) != 0) {
+        return 0;
+    }
+    if (pthread_cond_init(&gate->condition, NULL) != 0) {
+        (void)pthread_mutex_destroy(&gate->mutex);
+        return 0;
+    }
+    return 1;
+}
+
+static void gate_wait_for_started(struct task_gate *gate, size_t count)
+{
+    (void)pthread_mutex_lock(&gate->mutex);
+    while (gate->started < count) {
+        (void)pthread_cond_wait(&gate->condition, &gate->mutex);
+    }
+    (void)pthread_mutex_unlock(&gate->mutex);
+}
+
+static void gate_release(struct task_gate *gate)
+{
+    (void)pthread_mutex_lock(&gate->mutex);
+    gate->released = 1;
+    (void)pthread_cond_broadcast(&gate->condition);
+    (void)pthread_mutex_unlock(&gate->mutex);
+}
+
+static void gate_destroy(struct task_gate *gate)
+{
+    (void)pthread_cond_destroy(&gate->condition);
+    (void)pthread_mutex_destroy(&gate->mutex);
 }
 
 static int test_invalid_arguments(void)
@@ -69,32 +125,39 @@ static int test_submit_and_drain(void)
 
 static int test_full_queue(void)
 {
-    struct counter counter;
+    struct task_gate gate;
     thread_pool_t *pool = NULL;
-    size_t attempts;
-    int saw_full = 0;
-    const struct timespec delay = { 0, 1000000L };
 
-    counter.value = 0U;
-    CHECK(pthread_mutex_init(&counter.mutex, NULL) == 0);
+    CHECK(gate_init(&gate));
     CHECK(thread_pool_create(&pool, 1U, 1U) == THREAD_POOL_OK);
+    CHECK(thread_pool_submit(pool, gated_task, &gate) == THREAD_POOL_OK);
+    gate_wait_for_started(&gate, 1U);
+    CHECK(thread_pool_pending(pool) == 0U);
+    CHECK(thread_pool_submit(pool, gated_task, &gate) == THREAD_POOL_OK);
+    CHECK(thread_pool_pending(pool) == 1U);
+    CHECK(thread_pool_submit(pool, gated_task, &gate) == THREAD_POOL_QUEUE_FULL);
 
-    /* Keep the worker busy, then occupy the sole waiting slot. */
-    CHECK(thread_pool_submit(pool, slow_increment, &counter) == THREAD_POOL_OK);
-    for (attempts = 0U; attempts < 1000U; ++attempts) {
-        if (thread_pool_pending(pool) == 0U) {
-            break;
-        }
-        (void)nanosleep(&delay, NULL);
-    }
-    CHECK(thread_pool_submit(pool, slow_increment, &counter) == THREAD_POOL_OK);
-    CHECK(thread_pool_submit(pool, slow_increment, &counter) == THREAD_POOL_QUEUE_FULL);
-    saw_full = 1;
-    CHECK(saw_full);
-
+    gate_release(&gate);
     thread_pool_destroy(pool);
-    CHECK(counter.value == 2U);
-    CHECK(pthread_mutex_destroy(&counter.mutex) == 0);
+    CHECK(gate.started == 2U);
+    gate_destroy(&gate);
+    return 0;
+}
+
+static int test_concurrent_callbacks(void)
+{
+    struct task_gate gate;
+    thread_pool_t *pool = NULL;
+
+    CHECK(gate_init(&gate));
+    CHECK(thread_pool_create(&pool, 2U, 2U) == THREAD_POOL_OK);
+    CHECK(thread_pool_submit(pool, gated_task, &gate) == THREAD_POOL_OK);
+    CHECK(thread_pool_submit(pool, gated_task, &gate) == THREAD_POOL_OK);
+    gate_wait_for_started(&gate, 2U);
+    gate_release(&gate);
+    thread_pool_destroy(pool);
+    CHECK(gate.max_active == 2U);
+    gate_destroy(&gate);
     return 0;
 }
 
@@ -110,6 +173,7 @@ int main(void)
     CHECK(test_invalid_arguments() == 0);
     CHECK(test_submit_and_drain() == 0);
     CHECK(test_full_queue() == 0);
+    CHECK(test_concurrent_callbacks() == 0);
     CHECK(test_status_strings() == 0);
     (void)puts("All thread pool tests passed.");
     return 0;
