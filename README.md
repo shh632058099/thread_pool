@@ -9,7 +9,11 @@ The project uses C99 and CMake.
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
+./build/thread_pool_example
 ```
+
+The example target is enabled by default and can be disabled with
+`-DTHREAD_POOL_BUILD_EXAMPLES=OFF`.
 
 ## API
 
