@@ -11,6 +11,12 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+## Example
+
+The `thread_pool_basic_example` target demonstrates creating a pool, submitting
+work, and draining accepted tasks. Build it with the default configuration and
+run `./build/thread_pool_basic_example`.
+
 ## API
 
 Include `thread_pool.h` and link the `thread_pool` CMake target (which links
