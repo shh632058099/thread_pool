@@ -32,3 +32,17 @@ has finished. The pool drains all accepted work at shutdown.
 
 Status results are defined by `thread_pool_status_t`; use
 `thread_pool_status_string()` for a readable description.
+
+## Example
+
+The `thread_pool_example` executable submits eight square-calculation tasks,
+protects shared state with a mutex, and relies on pool destruction to drain
+accepted work. Build and run it with:
+
+```sh
+cmake -S . -B build -DTHREAD_POOL_BUILD_EXAMPLES=ON
+cmake --build build --target thread_pool_example
+./build/thread_pool_example
+```
+
+It prints `Sum of squares from 1 to 8: 204`.
