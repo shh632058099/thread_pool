@@ -32,3 +32,15 @@ has finished. The pool drains all accepted work at shutdown.
 
 Status results are defined by `thread_pool_status_t`; use
 `thread_pool_status_string()` for a readable description.
+
+## Example
+
+`examples/basic_usage.c` demonstrates creating a pool, submitting a task with
+caller-owned data, handling API status results, and draining accepted work with
+`thread_pool_destroy()`. Build and run it with:
+
+```sh
+cmake -S . -B build
+cmake --build build --target thread_pool_basic_usage
+./build/thread_pool_basic_usage
+```
